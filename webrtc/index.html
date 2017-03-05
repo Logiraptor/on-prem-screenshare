@@ -1,0 +1,38 @@
+<!doctype HTML>
+<html>
+    <body>
+        <video id="vid2"></video>
+        <video id="vid1"></video>
+
+        <script>
+            var vid2 = document.getElementById('vid2');
+            var vid1 = document.getElementById('vid2');
+
+            var pc1 = new RTCPeerConnection(/*servers*/);
+            var pc2 = new RTCPeerConnection(/*servers*/);
+            pc2.ontrack = gotRemoteStream;
+
+            navigator.mediaDevices.getUserMedia({audio: true, video: true}).then(function(s) {
+                pc1.addStream(s);
+                vid1.src = URL.createObjectURL(s);
+                
+                pc1.createOffer(gotDescription1)
+            }).catch(function(error) {
+                console.log(error);
+            });
+
+            function gotDescription1(desc) {
+                pc1.setLocalDescription(desc);
+                console.log("Offer from pc1", desc.sdp);
+
+                pc2.setRemoteDescription(desc)
+                pc2.createAnswer(gotDescription2)
+            }
+
+            function gotRemoteStream(e) {
+                vid2.src = URL.createObjectURL(e.stream);
+            }
+
+        </script>
+    </body>
+</html>
