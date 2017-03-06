@@ -2,6 +2,7 @@ var localVideo;
 var localStream;
 var remoteVideo;
 var peerConnection;
+var serverConnection;
 
 var peerConnectionConfig = {
     'iceServers': [
@@ -10,9 +11,16 @@ var peerConnectionConfig = {
     ]
 };
 
-function pageReady(streamid) {
+const {desktopCapturer} = require('electron');
+
+function pageReady() {
+
     localVideo = document.getElementById('localVideo');
     remoteVideo = document.getElementById('remoteVideo');
+    var startButton = document.getElementById("start-button");
+    startButton.addEventListener("click", function(e) {
+        start(true);
+    });
 
     serverConnection = new WebSocket('ws://127.0.0.1:3434/ws');
     serverConnection.onmessage = gotMessageFromServer;
@@ -22,11 +30,29 @@ function pageReady(streamid) {
         audio: true,
     };
 
-    if(navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia(constraints).then(getUserMediaSuccess).catch(errorHandler("getUserMedia"));
-    } else {
-        alert('Your browser does not support getUserMedia API');
-    }
+    desktopCapturer.getSources({types: ['window', 'screen']}, (error, sources) => {
+        if (error) throw error
+        for (let i = 0; i < sources.length; ++i) {
+            if (sources[i].name === 'Entire screen') {
+            navigator.webkitGetUserMedia({
+                audio: false,
+                video: {
+                mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: sources[i].id,
+                    minWidth: 1280,
+                    maxWidth: 1280,
+                    minHeight: 720,
+                    maxHeight: 720
+                }
+                }
+            }, getUserMediaSuccess, errorHandler("getUserMedia"))
+            return
+            } else {
+                console.log(sources[i].name);
+            }
+        }
+    })
 }
 
 function getUserMediaSuccess(stream) {
@@ -87,3 +113,5 @@ function errorHandler(from) {
         console.log(from, error);
     }
 }
+
+pageReady();
