@@ -3,6 +3,7 @@ var localStream;
 var remoteVideo;
 var peerConnection;
 var serverConnection;
+var numClients;
 
 var peerConnectionConfig = {
     'iceServers': [
@@ -14,15 +15,19 @@ var peerConnectionConfig = {
 const {desktopCapturer} = require('electron');
 
 function pageReady() {
-
     localVideo = document.getElementById('localVideo');
     remoteVideo = document.getElementById('remoteVideo');
+    var roomNameInput = document.getElementById('room-name');
     var startButton = document.getElementById("start-button");
+    numClients = document.getElementById("numClients");
     startButton.addEventListener("click", function(e) {
+        joinRoom(roomNameInput.value);
         start(true);
     });
+}
 
-    serverConnection = new WebSocket('ws://127.0.0.1:3434/ws');
+function joinRoom(name) {
+    serverConnection = new WebSocket('ws://127.0.0.1:3434/ws?room='+name);
     serverConnection.onmessage = gotMessageFromServer;
 
     var constraints = {
@@ -86,6 +91,8 @@ function gotMessageFromServer(message) {
         }).catch(errorHandler("setRemoteDescription"));
     } else if(signal.ice) {
         peerConnection.addIceCandidate(new RTCIceCandidate(signal.ice)).catch(errorHandler("addIceCandidate"));
+    } else if(signal.numClients) {
+        numClients.innerHTML = signal.numClients + " people are here.";
     }
 }
 
