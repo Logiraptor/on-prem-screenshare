@@ -9220,7 +9220,13 @@ var _user$project$Main$sendToServer = F2(
 			var body = A2(_elm_lang$core$Json_Encode$encode, 0, val);
 			return A2(
 				_elm_lang$websocket$WebSocket$send,
-				A2(_elm_lang$core$Basics_ops['++'], 'ws://127.0.0.1:3434/ws?room=', _p0._0),
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					'ws://',
+					A2(
+						_elm_lang$core$Basics_ops['++'],
+						model.hostname,
+						A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p0._0))),
 				body);
 		}
 	});
@@ -9346,9 +9352,9 @@ var _user$project$Main$update = F2(
 var _user$project$Main$onOffer = _elm_lang$core$Native_Platform.incomingPort('onOffer', _elm_lang$core$Json_Decode$value);
 var _user$project$Main$onAddStream = _elm_lang$core$Native_Platform.incomingPort('onAddStream', _elm_lang$core$Json_Decode$string);
 var _user$project$Main$errors = _elm_lang$core$Native_Platform.incomingPort('errors', _elm_lang$core$Json_Decode$string);
-var _user$project$Main$Model = F5(
-	function (a, b, c, d, e) {
-		return {room: a, enteredRoomValue: b, stream: c, errors: d, numClients: e};
+var _user$project$Main$Model = F6(
+	function (a, b, c, d, e, f) {
+		return {room: a, enteredRoomValue: b, stream: c, errors: d, numClients: e, hostname: f};
 	});
 var _user$project$Main$StartShare = {ctor: 'StartShare'};
 var _user$project$Main$viewWithRoom = F2(
@@ -9513,7 +9519,13 @@ var _user$project$Main$wsSub = function (model) {
 	} else {
 		return A2(
 			_elm_lang$websocket$WebSocket$listen,
-			A2(_elm_lang$core$Basics_ops['++'], 'ws://127.0.0.1:3434/ws?room=', _p4._0),
+			A2(
+				_elm_lang$core$Basics_ops['++'],
+				'ws://',
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					model.hostname,
+					A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p4._0))),
 			_user$project$Main$decodeMessage);
 	}
 };
@@ -9572,7 +9584,8 @@ var _user$project$Main$viewNoRoom = function (model) {
 				{ctor: '[]'},
 				{
 					ctor: '::',
-					_0: _elm_lang$html$Html$text('Choose a room'),
+					_0: _elm_lang$html$Html$text(
+						A2(_elm_lang$core$Basics_ops['++'], 'Choose a room', model.hostname)),
 					_1: {ctor: '[]'}
 				}),
 			_1: {
@@ -9630,23 +9643,26 @@ var _user$project$Main$view = function (model) {
 			}
 		});
 };
-var _user$project$Main$main = _elm_lang$html$Html$program(
+var _user$project$Main$main = _elm_lang$html$Html$programWithFlags(
 	{
-		init: {
-			ctor: '_Tuple2',
-			_0: {
-				room: _elm_lang$core$Maybe$Nothing,
-				enteredRoomValue: '',
-				stream: _elm_lang$core$Maybe$Nothing,
-				errors: {ctor: '[]'},
-				numClients: 0
-			},
-			_1: _elm_lang$core$Platform_Cmd$none
+		init: function (hostname) {
+			return {
+				ctor: '_Tuple2',
+				_0: {
+					room: _elm_lang$core$Maybe$Nothing,
+					enteredRoomValue: '',
+					stream: _elm_lang$core$Maybe$Nothing,
+					errors: {ctor: '[]'},
+					numClients: 0,
+					hostname: hostname
+				},
+				_1: _elm_lang$core$Platform_Cmd$none
+			};
 		},
 		view: _user$project$Main$view,
 		update: _user$project$Main$update,
 		subscriptions: _user$project$Main$subscriptions
-	})();
+	})(_elm_lang$core$Json_Decode$string);
 
 var Elm = {};
 Elm['Main'] = Elm['Main'] || {};

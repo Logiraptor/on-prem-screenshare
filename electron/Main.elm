@@ -32,17 +32,20 @@ port onAddStream : (String -> msg) -> Sub msg
 port errors : (String -> msg) -> Sub msg
 
 
-main : Program Never Model Msg
+main : Program String Model Msg
 main =
-    Html.program
+    Html.programWithFlags
         { init =
-            ( { room = Nothing
-              , enteredRoomValue = ""
-              , stream = Nothing
-              , errors = []
-              , numClients = 0
-              }
-            , Cmd.none
+            (\hostname ->
+                ( { room = Nothing
+                  , enteredRoomValue = ""
+                  , stream = Nothing
+                  , errors = []
+                  , numClients = 0
+                  , hostname = hostname
+                  }
+                , Cmd.none
+                )
             )
         , view = view
         , update = update
@@ -56,6 +59,7 @@ type alias Model =
     , stream : Maybe String
     , errors : List String
     , numClients : Int
+    , hostname : String
     }
 
 
@@ -122,7 +126,7 @@ viewWithRoom name model =
 viewNoRoom : Model -> Html.Html Msg
 viewNoRoom model =
     Html.div []
-        [ Html.h1 [] [ Html.text "Choose a room" ]
+        [ Html.h1 [] [ Html.text ("Choose a room" ++ model.hostname) ]
         , Html.input [ Attr.value model.enteredRoomValue, Events.onInput UpdateRoomName ] []
         , Html.button [ Events.onClick JoinRoom ] [ Html.text "Join" ]
         ]
@@ -183,7 +187,7 @@ wsSub model =
             Sub.none
 
         Just name ->
-            WebSocket.listen ("ws://127.0.0.1:3434/ws?room=" ++ name) decodeMessage
+            WebSocket.listen ("ws://" ++ model.hostname ++ "/ws?room=" ++ name) decodeMessage
 
 
 sendToServer : Model -> Json.Decode.Value -> Cmd Msg
@@ -197,7 +201,7 @@ sendToServer model val =
                 body =
                     Json.Encode.encode 0 val
             in
-                WebSocket.send ("ws://127.0.0.1:3434/ws?room=" ++ name) body
+                WebSocket.send ("ws://" ++ model.hostname ++ "/ws?room=" ++ name) body
 
 
 decodeMessage : String -> Msg

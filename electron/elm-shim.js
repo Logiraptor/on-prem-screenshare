@@ -7,7 +7,7 @@ var peerConnectionConfig = {
     ]
 };
 
-const app = Elm.Main.fullscreen();
+const app = Elm.Main.fullscreen('localhost:3434');
 
 var peerConnection = new RTCPeerConnection(peerConnectionConfig);
 
