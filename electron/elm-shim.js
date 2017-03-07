@@ -38,11 +38,14 @@ app.ports.setRemoteDescription.subscribe((sdp) => {
 });
 
 app.ports.createOffer.subscribe(() => {
-    peerConnection.createOffer().then((desc) => {
-        peerConnection.setLocalDescription(desc).then(() => {
-            app.ports.onOffer.send(desc);
+    captureScreen((stream) => {
+        peerConnection.addStream(stream);
+        peerConnection.createOffer().then((desc) => {
+            peerConnection.setLocalDescription(desc).then(() => {
+                app.ports.onOffer.send(desc);
+            }).catch(errorHandler);;
         }).catch(errorHandler);;
-    }).catch(errorHandler);;
+    });
 });
 
 function errorHandler(e) {
@@ -51,31 +54,32 @@ function errorHandler(e) {
 
 const {desktopCapturer} = require('electron');
 
-desktopCapturer.getSources({types: ['window', 'screen']}, (error, sources) => {
-    if (error) throw error
-    for (let i = 0; i < sources.length; ++i) {
-        if (sources[i].name === 'Entire screen') {
-            navigator.webkitGetUserMedia({
-                audio: false,
-                video: {
-                mandatory: {
-                    chromeMediaSource: 'desktop',
-                    chromeMediaSourceId: sources[i].id,
-                    minWidth: 1280,
-                    maxWidth: 1280,
-                    minHeight: 720,
-                    maxHeight: 720
-                }
-                }
-            }, (stream) => {
-                peerConnection.addStream(stream);
-            }, errorHandler)
-            return
-        } else {
-            console.log(sources[i].name);
+function captureScreen(callback) {
+    desktopCapturer.getSources({types: ['window', 'screen']}, (error, sources) => {
+        if (error) throw error
+        for (let i = 0; i < sources.length; ++i) {
+            if (sources[i].name === 'Entire screen') {
+                navigator.webkitGetUserMedia({
+                    audio: false,
+                    video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: sources[i].id,
+                        minWidth: 1280,
+                        maxWidth: 1280,
+                        minHeight: 720,
+                        maxHeight: 720
+                    }
+                    }
+                }, callback, errorHandler)
+                return
+            }
         }
-    }
-})
+    })
+}
+
+
+
 
 // create RTCPeerConnection
 // set up listeners for ice candidates and streams
