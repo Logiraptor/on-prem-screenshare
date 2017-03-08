@@ -37,11 +37,8 @@ main =
     Html.programWithFlags
         { init =
             (\hostname ->
-                ( { room = Nothing
-                  , enteredRoomValue = ""
-                  , stream = Nothing
+                ( { room = InLobby { roomName = "" }
                   , errors = []
-                  , numClients = 0
                   , hostname = hostname
                   }
                 , Cmd.none
@@ -54,25 +51,55 @@ main =
 
 
 type alias Model =
-    { room : Maybe String
-    , enteredRoomValue : String
-    , stream : Maybe String
+    { room : RoomState
     , errors : List String
-    , numClients : Int
     , hostname : String
     }
 
 
 type Msg
     = UpdateRoomName String
-    | JoinRoom
+    | JoinRoom String
     | NumClients Int
-    | SDP Json.Decode.Value
-    | ICE Json.Decode.Value
+    | RemoteSDP Json.Decode.Value
+    | RemoteICE Json.Decode.Value
+    | LocalSDP Json.Decode.Value
     | ErrorEvent String
-    | SendToServer Json.Decode.Value
+    | LocalICE Json.Decode.Value
     | AddStream String
     | StartShare
+
+
+type alias ICECandiate =
+    Json.Decode.Value
+
+
+type alias SessionDescription =
+    Json.Decode.Value
+
+
+type alias Stream =
+    String
+
+
+type RTCPeerConnectionState
+    = GatheringICE (List ICECandiate)
+    | NegotiatingSession
+    | Connected Stream
+
+
+type alias Room =
+    { name : String, numClients : Int }
+
+
+type alias Lobby =
+    { roomName : String }
+
+
+type RoomState
+    = InLobby Lobby
+    | Waiting Room
+    | Sharing Room RTCPeerConnectionState
 
 
 view : Model -> Html.Html Msg
@@ -86,11 +113,54 @@ view model =
 viewContent : Model -> Html.Html Msg
 viewContent model =
     case model.room of
-        Nothing ->
-            viewNoRoom model
+        InLobby lobby ->
+            viewLobby lobby
 
-        Just room ->
-            viewWithRoom room model
+        Waiting room ->
+            viewWaiting room
+
+        Sharing room connection ->
+            viewSharing room connection
+
+
+viewLobby : Lobby -> Html.Html Msg
+viewLobby lobby =
+    Html.div []
+        [ Html.h1 [] [ Html.text ("Choose a room") ]
+        , Html.input [ Attr.value lobby.roomName, Events.onInput UpdateRoomName ] []
+        , Html.button [ Events.onClick (JoinRoom lobby.roomName) ] [ Html.text "Join" ]
+        ]
+
+
+viewWaiting : Room -> Html.Html Msg
+viewWaiting room =
+    Html.div []
+        [ Html.h1 [] [ Html.text room.name ]
+        , Html.span [] [ Html.text (room.numClients |> toString |> (++) "Clients: ") ]
+        , Html.button [ Events.onClick StartShare ] [ Html.text "Start Share" ]
+        ]
+
+
+viewSharing : Room -> RTCPeerConnectionState -> Html.Html Msg
+viewSharing room connection =
+    Html.div []
+        [ Html.h1 [] [ Html.text room.name ]
+        , Html.span [] [ Html.text (room.numClients |> toString |> (++) "Clients: ") ]
+        , viewConnection connection
+        ]
+
+
+viewConnection : RTCPeerConnectionState -> Html.Html Msg
+viewConnection conn =
+    case conn of
+        GatheringICE candidates ->
+            Html.span [] [ Html.text ("gathering ice (" ++ (toString (List.length candidates)) ++ ") so far.") ]
+
+        NegotiatingSession ->
+            Html.span [] [ Html.text "Negotiating Session" ]
+
+        Connected stream ->
+            Html.video [ Attr.src stream, Attr.autoplay True ] []
 
 
 viewErrors : Model -> Html.Html Msg
@@ -105,71 +175,101 @@ viewError s =
         ]
 
 
-viewWithRoom : String -> Model -> Html.Html Msg
-viewWithRoom name model =
-    case model.stream of
-        Nothing ->
-            Html.div []
-                [ Html.h1 [] [ Html.text name ]
-                , Html.span [] [ Html.text (model.numClients |> toString |> (++) "Clients: ") ]
-                , Html.button [ Events.onClick StartShare ] [ Html.text "Start Share" ]
-                ]
-
-        Just s ->
-            Html.div []
-                [ Html.h1 [] [ Html.text name ]
-                , Html.span [] [ Html.text (model.numClients |> toString |> (++) "Clients: ") ]
-                , Html.video [ Attr.src s, Attr.autoplay True ] []
-                ]
-
-
-viewNoRoom : Model -> Html.Html Msg
-viewNoRoom model =
-    Html.div []
-        [ Html.h1 [] [ Html.text ("Choose a room" ++ model.hostname) ]
-        , Html.input [ Attr.value model.enteredRoomValue, Events.onInput UpdateRoomName ] []
-        , Html.button [ Events.onClick JoinRoom ] [ Html.text "Join" ]
-        ]
+invalidMessage : Msg -> Model -> ( Model, Cmd Msg )
+invalidMessage msg model =
+    let
+        message =
+            "Invalid message in "
+                ++ (toString model.room)
+                ++ "\n"
+                ++ (toString msg)
+    in
+        ( { model | errors = message :: model.errors }, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        UpdateRoomName name ->
-            ( { model | enteredRoomValue = name }, Cmd.none )
+    case model.room of
+        InLobby l ->
+            case msg of
+                UpdateRoomName name ->
+                    ( { model | room = InLobby { roomName = name } }, Cmd.none )
 
-        JoinRoom ->
-            ( { model | room = Just model.enteredRoomValue }, Cmd.none )
+                JoinRoom s ->
+                    ( { model | room = Waiting { name = s, numClients = 0 } }, Cmd.none )
 
-        ErrorEvent e ->
-            ( { model | errors = e :: model.errors }, Cmd.none )
+                msg ->
+                    invalidMessage msg model
 
-        ICE val ->
-            ( model, addIceCandidate val )
+        Waiting room ->
+            case msg of
+                StartShare ->
+                    ( { model | room = Sharing room (GatheringICE []) }, createOffer () )
 
-        SDP val ->
-            ( model, setRemoteDescription val )
+                NumClients n ->
+                    ( { model | room = Waiting ({ room | numClients = n }) }, Cmd.none )
 
-        SendToServer val ->
-            ( model, sendToServer model val )
+                RemoteICE val ->
+                    ( { model | room = Sharing room (GatheringICE [ val ]) }, Cmd.none )
 
-        AddStream s ->
-            ( { model | stream = Just s }, Cmd.none )
+                RemoteSDP val ->
+                    ( model, setRemoteDescription val )
 
-        NumClients n ->
-            ( { model | numClients = n }, Cmd.none )
+                msg ->
+                    invalidMessage msg model
 
-        StartShare ->
-            ( model, createOffer () )
+        Sharing room conn ->
+            case msg of
+                NumClients n ->
+                    ( { model | room = Sharing ({ room | numClients = n }) conn }, Cmd.none )
+
+                LocalSDP val ->
+                    ( model, sendToServer model (wrapWithField "sdp" val) )
+
+                RemoteSDP val ->
+                    case conn of
+                        Connected _ ->
+                            ( { model | room = Sharing room NegotiatingSession }, setRemoteDescription val )
+
+                        GatheringICE candidates ->
+                            ( { model | room = Sharing room NegotiatingSession }
+                            , Cmd.batch
+                                [ setRemoteDescription val
+                                , Cmd.batch (List.map addIceCandidate candidates)
+                                ]
+                            )
+
+                        NegotiatingSession ->
+                            ( { model | room = Sharing room NegotiatingSession }, setRemoteDescription val )
+
+                LocalICE val ->
+                    ( model, sendToServer model (wrapWithField "ice" val) )
+
+                RemoteICE val ->
+                    case conn of
+                        Connected _ ->
+                            ( model, Cmd.none )
+
+                        GatheringICE candidates ->
+                            ( { model | room = Sharing room (GatheringICE (val :: candidates)) }, Cmd.none )
+
+                        NegotiatingSession ->
+                            ( model, addIceCandidate val )
+
+                AddStream s ->
+                    ( { model | room = Sharing room (Connected s) }, Cmd.none )
+
+                msg ->
+                    invalidMessage msg model
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ wsSub model
-        , onIceCandidate (wrapWithField "ice" >> SendToServer)
-        , onAnswer (wrapWithField "sdp" >> SendToServer)
-        , onOffer (wrapWithField "sdp" >> SendToServer)
+        , onIceCandidate LocalICE
+        , onAnswer LocalSDP
+        , onOffer LocalSDP
         , onAddStream AddStream
         , errors ErrorEvent
         ]
@@ -183,25 +283,29 @@ wrapWithField key val =
 wsSub : Model -> Sub Msg
 wsSub model =
     case model.room of
-        Nothing ->
+        InLobby _ ->
             Sub.none
 
-        Just name ->
-            WebSocket.listen ("ws://" ++ model.hostname ++ "/ws?room=" ++ name) decodeMessage
+        Waiting room ->
+            WebSocket.listen ("ws://" ++ model.hostname ++ "/ws?room=" ++ room.name) decodeMessage
+
+        Sharing room conn ->
+            WebSocket.listen ("ws://" ++ model.hostname ++ "/ws?room=" ++ room.name) decodeMessage
 
 
 sendToServer : Model -> Json.Decode.Value -> Cmd Msg
 sendToServer model val =
     case model.room of
-        Nothing ->
+        InLobby _ ->
             Cmd.none
 
-        Just name ->
-            let
-                body =
-                    Json.Encode.encode 0 val
-            in
-                WebSocket.send ("ws://" ++ model.hostname ++ "/ws?room=" ++ name) body
+        Waiting room ->
+            Json.Encode.encode 0 val
+                |> WebSocket.send ("ws://" ++ model.hostname ++ "/ws?room=" ++ room.name)
+
+        Sharing room conn ->
+            Json.Encode.encode 0 val
+                |> WebSocket.send ("ws://" ++ model.hostname ++ "/ws?room=" ++ room.name)
 
 
 decodeMessage : String -> Msg
@@ -221,12 +325,12 @@ messageDecoder =
 
 sdpDecoder : Json.Decode.Decoder Msg
 sdpDecoder =
-    Json.Decode.field "sdp" Json.Decode.value |> Json.Decode.map SDP
+    Json.Decode.field "sdp" Json.Decode.value |> Json.Decode.map RemoteSDP
 
 
 iceDecoder : Json.Decode.Decoder Msg
 iceDecoder =
-    Json.Decode.field "ice" Json.Decode.value |> Json.Decode.map ICE
+    Json.Decode.field "ice" Json.Decode.value |> Json.Decode.map RemoteICE
 
 
 numClientsDecoder : Json.Decode.Decoder Msg

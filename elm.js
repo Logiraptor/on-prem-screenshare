@@ -9214,20 +9214,31 @@ _elm_lang$core$Native_Platform.effectManagers['WebSocket'] = {pkg: 'elm-lang/web
 var _user$project$Main$sendToServer = F2(
 	function (model, val) {
 		var _p0 = model.room;
-		if (_p0.ctor === 'Nothing') {
-			return _elm_lang$core$Platform_Cmd$none;
-		} else {
-			var body = A2(_elm_lang$core$Json_Encode$encode, 0, val);
-			return A2(
-				_elm_lang$websocket$WebSocket$send,
-				A2(
-					_elm_lang$core$Basics_ops['++'],
-					'ws://',
+		switch (_p0.ctor) {
+			case 'InLobby':
+				return _elm_lang$core$Platform_Cmd$none;
+			case 'Waiting':
+				return A2(
+					_elm_lang$websocket$WebSocket$send,
 					A2(
 						_elm_lang$core$Basics_ops['++'],
-						model.hostname,
-						A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p0._0))),
-				body);
+						'ws://',
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							model.hostname,
+							A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p0._0.name))),
+					A2(_elm_lang$core$Json_Encode$encode, 0, val));
+			default:
+				return A2(
+					_elm_lang$websocket$WebSocket$send,
+					A2(
+						_elm_lang$core$Basics_ops['++'],
+						'ws://',
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							model.hostname,
+							A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p0._0.name))),
+					A2(_elm_lang$core$Json_Encode$encode, 0, val));
 		}
 	});
 var _user$project$Main$wrapWithField = F2(
@@ -9238,6 +9249,28 @@ var _user$project$Main$wrapWithField = F2(
 				_0: {ctor: '_Tuple2', _0: key, _1: val},
 				_1: {ctor: '[]'}
 			});
+	});
+var _user$project$Main$invalidMessage = F2(
+	function (msg, model) {
+		var message = A2(
+			_elm_lang$core$Basics_ops['++'],
+			'Invalid message in ',
+			A2(
+				_elm_lang$core$Basics_ops['++'],
+				_elm_lang$core$Basics$toString(model.room),
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					'\n',
+					_elm_lang$core$Basics$toString(msg))));
+		return {
+			ctor: '_Tuple2',
+			_0: _elm_lang$core$Native_Utils.update(
+				model,
+				{
+					errors: {ctor: '::', _0: message, _1: model.errors}
+				}),
+			_1: _elm_lang$core$Platform_Cmd$none
+		};
 	});
 var _user$project$Main$viewError = function (s) {
 	return A2(
@@ -9255,6 +9288,90 @@ var _user$project$Main$viewErrors = function (model) {
 		{ctor: '[]'},
 		A2(_elm_lang$core$List$map, _user$project$Main$viewError, model.errors));
 };
+var _user$project$Main$viewConnection = function (conn) {
+	var _p1 = conn;
+	switch (_p1.ctor) {
+		case 'GatheringICE':
+			return A2(
+				_elm_lang$html$Html$span,
+				{ctor: '[]'},
+				{
+					ctor: '::',
+					_0: _elm_lang$html$Html$text(
+						A2(
+							_elm_lang$core$Basics_ops['++'],
+							'gathering ice (',
+							A2(
+								_elm_lang$core$Basics_ops['++'],
+								_elm_lang$core$Basics$toString(
+									_elm_lang$core$List$length(_p1._0)),
+								') so far.'))),
+					_1: {ctor: '[]'}
+				});
+		case 'NegotiatingSession':
+			return A2(
+				_elm_lang$html$Html$span,
+				{ctor: '[]'},
+				{
+					ctor: '::',
+					_0: _elm_lang$html$Html$text('Negotiating Session'),
+					_1: {ctor: '[]'}
+				});
+		default:
+			return A2(
+				_elm_lang$html$Html$video,
+				{
+					ctor: '::',
+					_0: _elm_lang$html$Html_Attributes$src(_p1._0),
+					_1: {
+						ctor: '::',
+						_0: _elm_lang$html$Html_Attributes$autoplay(true),
+						_1: {ctor: '[]'}
+					}
+				},
+				{ctor: '[]'});
+	}
+};
+var _user$project$Main$viewSharing = F2(
+	function (room, connection) {
+		return A2(
+			_elm_lang$html$Html$div,
+			{ctor: '[]'},
+			{
+				ctor: '::',
+				_0: A2(
+					_elm_lang$html$Html$h1,
+					{ctor: '[]'},
+					{
+						ctor: '::',
+						_0: _elm_lang$html$Html$text(room.name),
+						_1: {ctor: '[]'}
+					}),
+				_1: {
+					ctor: '::',
+					_0: A2(
+						_elm_lang$html$Html$span,
+						{ctor: '[]'},
+						{
+							ctor: '::',
+							_0: _elm_lang$html$Html$text(
+								A2(
+									F2(
+										function (x, y) {
+											return A2(_elm_lang$core$Basics_ops['++'], x, y);
+										}),
+									'Clients: ',
+									_elm_lang$core$Basics$toString(room.numClients))),
+							_1: {ctor: '[]'}
+						}),
+					_1: {
+						ctor: '::',
+						_0: _user$project$Main$viewConnection(connection),
+						_1: {ctor: '[]'}
+					}
+				}
+			});
+	});
 var _user$project$Main$onIceCandidate = _elm_lang$core$Native_Platform.incomingPort('onIceCandidate', _elm_lang$core$Json_Decode$value);
 var _user$project$Main$addIceCandidate = _elm_lang$core$Native_Platform.outgoingPort(
 	'addIceCandidate',
@@ -9272,216 +9389,96 @@ var _user$project$Main$createOffer = _elm_lang$core$Native_Platform.outgoingPort
 	function (v) {
 		return null;
 	});
-var _user$project$Main$update = F2(
-	function (msg, model) {
-		var _p1 = msg;
-		switch (_p1.ctor) {
-			case 'UpdateRoomName':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{enteredRoomValue: _p1._0}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			case 'JoinRoom':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							room: _elm_lang$core$Maybe$Just(model.enteredRoomValue)
-						}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			case 'ErrorEvent':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							errors: {ctor: '::', _0: _p1._0, _1: model.errors}
-						}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			case 'ICE':
-				return {
-					ctor: '_Tuple2',
-					_0: model,
-					_1: _user$project$Main$addIceCandidate(_p1._0)
-				};
-			case 'SDP':
-				return {
-					ctor: '_Tuple2',
-					_0: model,
-					_1: _user$project$Main$setRemoteDescription(_p1._0)
-				};
-			case 'SendToServer':
-				return {
-					ctor: '_Tuple2',
-					_0: model,
-					_1: A2(_user$project$Main$sendToServer, model, _p1._0)
-				};
-			case 'AddStream':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{
-							stream: _elm_lang$core$Maybe$Just(_p1._0)
-						}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			case 'NumClients':
-				return {
-					ctor: '_Tuple2',
-					_0: _elm_lang$core$Native_Utils.update(
-						model,
-						{numClients: _p1._0}),
-					_1: _elm_lang$core$Platform_Cmd$none
-				};
-			default:
-				return {
-					ctor: '_Tuple2',
-					_0: model,
-					_1: _user$project$Main$createOffer(
-						{ctor: '_Tuple0'})
-				};
-		}
-	});
 var _user$project$Main$onOffer = _elm_lang$core$Native_Platform.incomingPort('onOffer', _elm_lang$core$Json_Decode$value);
 var _user$project$Main$onAddStream = _elm_lang$core$Native_Platform.incomingPort('onAddStream', _elm_lang$core$Json_Decode$string);
 var _user$project$Main$errors = _elm_lang$core$Native_Platform.incomingPort('errors', _elm_lang$core$Json_Decode$string);
-var _user$project$Main$Model = F6(
-	function (a, b, c, d, e, f) {
-		return {room: a, enteredRoomValue: b, stream: c, errors: d, numClients: e, hostname: f};
+var _user$project$Main$Model = F3(
+	function (a, b, c) {
+		return {room: a, errors: b, hostname: c};
 	});
+var _user$project$Main$Room = F2(
+	function (a, b) {
+		return {name: a, numClients: b};
+	});
+var _user$project$Main$Lobby = function (a) {
+	return {roomName: a};
+};
 var _user$project$Main$StartShare = {ctor: 'StartShare'};
-var _user$project$Main$viewWithRoom = F2(
-	function (name, model) {
-		var _p2 = model.stream;
-		if (_p2.ctor === 'Nothing') {
-			return A2(
-				_elm_lang$html$Html$div,
+var _user$project$Main$viewWaiting = function (room) {
+	return A2(
+		_elm_lang$html$Html$div,
+		{ctor: '[]'},
+		{
+			ctor: '::',
+			_0: A2(
+				_elm_lang$html$Html$h1,
 				{ctor: '[]'},
 				{
 					ctor: '::',
-					_0: A2(
-						_elm_lang$html$Html$h1,
-						{ctor: '[]'},
-						{
-							ctor: '::',
-							_0: _elm_lang$html$Html$text(name),
-							_1: {ctor: '[]'}
-						}),
-					_1: {
+					_0: _elm_lang$html$Html$text(room.name),
+					_1: {ctor: '[]'}
+				}),
+			_1: {
+				ctor: '::',
+				_0: A2(
+					_elm_lang$html$Html$span,
+					{ctor: '[]'},
+					{
 						ctor: '::',
-						_0: A2(
-							_elm_lang$html$Html$span,
-							{ctor: '[]'},
-							{
-								ctor: '::',
-								_0: _elm_lang$html$Html$text(
-									A2(
-										F2(
-											function (x, y) {
-												return A2(_elm_lang$core$Basics_ops['++'], x, y);
-											}),
-										'Clients: ',
-										_elm_lang$core$Basics$toString(model.numClients))),
-								_1: {ctor: '[]'}
-							}),
-						_1: {
-							ctor: '::',
-							_0: A2(
-								_elm_lang$html$Html$button,
-								{
-									ctor: '::',
-									_0: _elm_lang$html$Html_Events$onClick(_user$project$Main$StartShare),
-									_1: {ctor: '[]'}
-								},
-								{
-									ctor: '::',
-									_0: _elm_lang$html$Html$text('Start Share'),
-									_1: {ctor: '[]'}
-								}),
-							_1: {ctor: '[]'}
-						}
-					}
-				});
-		} else {
-			return A2(
-				_elm_lang$html$Html$div,
-				{ctor: '[]'},
-				{
+						_0: _elm_lang$html$Html$text(
+							A2(
+								F2(
+									function (x, y) {
+										return A2(_elm_lang$core$Basics_ops['++'], x, y);
+									}),
+								'Clients: ',
+								_elm_lang$core$Basics$toString(room.numClients))),
+						_1: {ctor: '[]'}
+					}),
+				_1: {
 					ctor: '::',
 					_0: A2(
-						_elm_lang$html$Html$h1,
-						{ctor: '[]'},
+						_elm_lang$html$Html$button,
 						{
 							ctor: '::',
-							_0: _elm_lang$html$Html$text(name),
+							_0: _elm_lang$html$Html_Events$onClick(_user$project$Main$StartShare),
+							_1: {ctor: '[]'}
+						},
+						{
+							ctor: '::',
+							_0: _elm_lang$html$Html$text('Start Share'),
 							_1: {ctor: '[]'}
 						}),
-					_1: {
-						ctor: '::',
-						_0: A2(
-							_elm_lang$html$Html$span,
-							{ctor: '[]'},
-							{
-								ctor: '::',
-								_0: _elm_lang$html$Html$text(
-									A2(
-										F2(
-											function (x, y) {
-												return A2(_elm_lang$core$Basics_ops['++'], x, y);
-											}),
-										'Clients: ',
-										_elm_lang$core$Basics$toString(model.numClients))),
-								_1: {ctor: '[]'}
-							}),
-						_1: {
-							ctor: '::',
-							_0: A2(
-								_elm_lang$html$Html$video,
-								{
-									ctor: '::',
-									_0: _elm_lang$html$Html_Attributes$src(_p2._0),
-									_1: {
-										ctor: '::',
-										_0: _elm_lang$html$Html_Attributes$autoplay(true),
-										_1: {ctor: '[]'}
-									}
-								},
-								{ctor: '[]'}),
-							_1: {ctor: '[]'}
-						}
-					}
-				});
-		}
-	});
+					_1: {ctor: '[]'}
+				}
+			}
+		});
+};
 var _user$project$Main$AddStream = function (a) {
 	return {ctor: 'AddStream', _0: a};
 };
-var _user$project$Main$SendToServer = function (a) {
-	return {ctor: 'SendToServer', _0: a};
+var _user$project$Main$LocalICE = function (a) {
+	return {ctor: 'LocalICE', _0: a};
 };
 var _user$project$Main$ErrorEvent = function (a) {
 	return {ctor: 'ErrorEvent', _0: a};
 };
-var _user$project$Main$ICE = function (a) {
-	return {ctor: 'ICE', _0: a};
+var _user$project$Main$LocalSDP = function (a) {
+	return {ctor: 'LocalSDP', _0: a};
+};
+var _user$project$Main$RemoteICE = function (a) {
+	return {ctor: 'RemoteICE', _0: a};
 };
 var _user$project$Main$iceDecoder = A2(
 	_elm_lang$core$Json_Decode$map,
-	_user$project$Main$ICE,
+	_user$project$Main$RemoteICE,
 	A2(_elm_lang$core$Json_Decode$field, 'ice', _elm_lang$core$Json_Decode$value));
-var _user$project$Main$SDP = function (a) {
-	return {ctor: 'SDP', _0: a};
+var _user$project$Main$RemoteSDP = function (a) {
+	return {ctor: 'RemoteSDP', _0: a};
 };
 var _user$project$Main$sdpDecoder = A2(
 	_elm_lang$core$Json_Decode$map,
-	_user$project$Main$SDP,
+	_user$project$Main$RemoteSDP,
 	A2(_elm_lang$core$Json_Decode$field, 'sdp', _elm_lang$core$Json_Decode$value));
 var _user$project$Main$NumClients = function (a) {
 	return {ctor: 'NumClients', _0: a};
@@ -9505,28 +9502,40 @@ var _user$project$Main$messageDecoder = _elm_lang$core$Json_Decode$oneOf(
 		}
 	});
 var _user$project$Main$decodeMessage = function (s) {
-	var _p3 = A2(_elm_lang$core$Json_Decode$decodeString, _user$project$Main$messageDecoder, s);
-	if (_p3.ctor === 'Ok') {
-		return _p3._0;
+	var _p2 = A2(_elm_lang$core$Json_Decode$decodeString, _user$project$Main$messageDecoder, s);
+	if (_p2.ctor === 'Ok') {
+		return _p2._0;
 	} else {
-		return _user$project$Main$ErrorEvent(_p3._0);
+		return _user$project$Main$ErrorEvent(_p2._0);
 	}
 };
 var _user$project$Main$wsSub = function (model) {
-	var _p4 = model.room;
-	if (_p4.ctor === 'Nothing') {
-		return _elm_lang$core$Platform_Sub$none;
-	} else {
-		return A2(
-			_elm_lang$websocket$WebSocket$listen,
-			A2(
-				_elm_lang$core$Basics_ops['++'],
-				'ws://',
+	var _p3 = model.room;
+	switch (_p3.ctor) {
+		case 'InLobby':
+			return _elm_lang$core$Platform_Sub$none;
+		case 'Waiting':
+			return A2(
+				_elm_lang$websocket$WebSocket$listen,
 				A2(
 					_elm_lang$core$Basics_ops['++'],
-					model.hostname,
-					A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p4._0))),
-			_user$project$Main$decodeMessage);
+					'ws://',
+					A2(
+						_elm_lang$core$Basics_ops['++'],
+						model.hostname,
+						A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p3._0.name))),
+				_user$project$Main$decodeMessage);
+		default:
+			return A2(
+				_elm_lang$websocket$WebSocket$listen,
+				A2(
+					_elm_lang$core$Basics_ops['++'],
+					'ws://',
+					A2(
+						_elm_lang$core$Basics_ops['++'],
+						model.hostname,
+						A2(_elm_lang$core$Basics_ops['++'], '/ws?room=', _p3._0.name))),
+				_user$project$Main$decodeMessage);
 	}
 };
 var _user$project$Main$subscriptions = function (model) {
@@ -9536,25 +9545,13 @@ var _user$project$Main$subscriptions = function (model) {
 			_0: _user$project$Main$wsSub(model),
 			_1: {
 				ctor: '::',
-				_0: _user$project$Main$onIceCandidate(
-					function (_p5) {
-						return _user$project$Main$SendToServer(
-							A2(_user$project$Main$wrapWithField, 'ice', _p5));
-					}),
+				_0: _user$project$Main$onIceCandidate(_user$project$Main$LocalICE),
 				_1: {
 					ctor: '::',
-					_0: _user$project$Main$onAnswer(
-						function (_p6) {
-							return _user$project$Main$SendToServer(
-								A2(_user$project$Main$wrapWithField, 'sdp', _p6));
-						}),
+					_0: _user$project$Main$onAnswer(_user$project$Main$LocalSDP),
 					_1: {
 						ctor: '::',
-						_0: _user$project$Main$onOffer(
-							function (_p7) {
-								return _user$project$Main$SendToServer(
-									A2(_user$project$Main$wrapWithField, 'sdp', _p7));
-							}),
+						_0: _user$project$Main$onOffer(_user$project$Main$LocalSDP),
 						_1: {
 							ctor: '::',
 							_0: _user$project$Main$onAddStream(_user$project$Main$AddStream),
@@ -9569,11 +9566,13 @@ var _user$project$Main$subscriptions = function (model) {
 			}
 		});
 };
-var _user$project$Main$JoinRoom = {ctor: 'JoinRoom'};
+var _user$project$Main$JoinRoom = function (a) {
+	return {ctor: 'JoinRoom', _0: a};
+};
 var _user$project$Main$UpdateRoomName = function (a) {
 	return {ctor: 'UpdateRoomName', _0: a};
 };
-var _user$project$Main$viewNoRoom = function (model) {
+var _user$project$Main$viewLobby = function (lobby) {
 	return A2(
 		_elm_lang$html$Html$div,
 		{ctor: '[]'},
@@ -9584,8 +9583,7 @@ var _user$project$Main$viewNoRoom = function (model) {
 				{ctor: '[]'},
 				{
 					ctor: '::',
-					_0: _elm_lang$html$Html$text(
-						A2(_elm_lang$core$Basics_ops['++'], 'Choose a room', model.hostname)),
+					_0: _elm_lang$html$Html$text('Choose a room'),
 					_1: {ctor: '[]'}
 				}),
 			_1: {
@@ -9594,7 +9592,7 @@ var _user$project$Main$viewNoRoom = function (model) {
 					_elm_lang$html$Html$input,
 					{
 						ctor: '::',
-						_0: _elm_lang$html$Html_Attributes$value(model.enteredRoomValue),
+						_0: _elm_lang$html$Html_Attributes$value(lobby.roomName),
 						_1: {
 							ctor: '::',
 							_0: _elm_lang$html$Html_Events$onInput(_user$project$Main$UpdateRoomName),
@@ -9608,7 +9606,8 @@ var _user$project$Main$viewNoRoom = function (model) {
 						_elm_lang$html$Html$button,
 						{
 							ctor: '::',
-							_0: _elm_lang$html$Html_Events$onClick(_user$project$Main$JoinRoom),
+							_0: _elm_lang$html$Html_Events$onClick(
+								_user$project$Main$JoinRoom(lobby.roomName)),
 							_1: {ctor: '[]'}
 						},
 						{
@@ -9622,11 +9621,14 @@ var _user$project$Main$viewNoRoom = function (model) {
 		});
 };
 var _user$project$Main$viewContent = function (model) {
-	var _p8 = model.room;
-	if (_p8.ctor === 'Nothing') {
-		return _user$project$Main$viewNoRoom(model);
-	} else {
-		return A2(_user$project$Main$viewWithRoom, _p8._0, model);
+	var _p4 = model.room;
+	switch (_p4.ctor) {
+		case 'InLobby':
+			return _user$project$Main$viewLobby(_p4._0);
+		case 'Waiting':
+			return _user$project$Main$viewWaiting(_p4._0);
+		default:
+			return A2(_user$project$Main$viewSharing, _p4._0, _p4._1);
 	}
 };
 var _user$project$Main$view = function (model) {
@@ -9643,17 +9645,251 @@ var _user$project$Main$view = function (model) {
 			}
 		});
 };
+var _user$project$Main$Connected = function (a) {
+	return {ctor: 'Connected', _0: a};
+};
+var _user$project$Main$NegotiatingSession = {ctor: 'NegotiatingSession'};
+var _user$project$Main$GatheringICE = function (a) {
+	return {ctor: 'GatheringICE', _0: a};
+};
+var _user$project$Main$Sharing = F2(
+	function (a, b) {
+		return {ctor: 'Sharing', _0: a, _1: b};
+	});
+var _user$project$Main$Waiting = function (a) {
+	return {ctor: 'Waiting', _0: a};
+};
+var _user$project$Main$InLobby = function (a) {
+	return {ctor: 'InLobby', _0: a};
+};
+var _user$project$Main$update = F2(
+	function (msg, model) {
+		var _p5 = model.room;
+		switch (_p5.ctor) {
+			case 'InLobby':
+				var _p6 = msg;
+				switch (_p6.ctor) {
+					case 'UpdateRoomName':
+						return {
+							ctor: '_Tuple2',
+							_0: _elm_lang$core$Native_Utils.update(
+								model,
+								{
+									room: _user$project$Main$InLobby(
+										{roomName: _p6._0})
+								}),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					case 'JoinRoom':
+						return {
+							ctor: '_Tuple2',
+							_0: _elm_lang$core$Native_Utils.update(
+								model,
+								{
+									room: _user$project$Main$Waiting(
+										{name: _p6._0, numClients: 0})
+								}),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					default:
+						return A2(_user$project$Main$invalidMessage, _p6, model);
+				}
+			case 'Waiting':
+				var _p8 = _p5._0;
+				var _p7 = msg;
+				switch (_p7.ctor) {
+					case 'StartShare':
+						return {
+							ctor: '_Tuple2',
+							_0: _elm_lang$core$Native_Utils.update(
+								model,
+								{
+									room: A2(
+										_user$project$Main$Sharing,
+										_p8,
+										_user$project$Main$GatheringICE(
+											{ctor: '[]'}))
+								}),
+							_1: _user$project$Main$createOffer(
+								{ctor: '_Tuple0'})
+						};
+					case 'NumClients':
+						return {
+							ctor: '_Tuple2',
+							_0: _elm_lang$core$Native_Utils.update(
+								model,
+								{
+									room: _user$project$Main$Waiting(
+										_elm_lang$core$Native_Utils.update(
+											_p8,
+											{numClients: _p7._0}))
+								}),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					case 'RemoteICE':
+						return {
+							ctor: '_Tuple2',
+							_0: _elm_lang$core$Native_Utils.update(
+								model,
+								{
+									room: A2(
+										_user$project$Main$Sharing,
+										_p8,
+										_user$project$Main$GatheringICE(
+											{
+												ctor: '::',
+												_0: _p7._0,
+												_1: {ctor: '[]'}
+											}))
+								}),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					case 'RemoteSDP':
+						return {
+							ctor: '_Tuple2',
+							_0: model,
+							_1: _user$project$Main$setRemoteDescription(_p7._0)
+						};
+					default:
+						return A2(_user$project$Main$invalidMessage, _p7, model);
+				}
+			default:
+				var _p15 = _p5._0;
+				var _p14 = _p5._1;
+				var _p9 = msg;
+				switch (_p9.ctor) {
+					case 'NumClients':
+						return {
+							ctor: '_Tuple2',
+							_0: _elm_lang$core$Native_Utils.update(
+								model,
+								{
+									room: A2(
+										_user$project$Main$Sharing,
+										_elm_lang$core$Native_Utils.update(
+											_p15,
+											{numClients: _p9._0}),
+										_p14)
+								}),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					case 'LocalSDP':
+						return {
+							ctor: '_Tuple2',
+							_0: model,
+							_1: A2(
+								_user$project$Main$sendToServer,
+								model,
+								A2(_user$project$Main$wrapWithField, 'sdp', _p9._0))
+						};
+					case 'RemoteSDP':
+						var _p11 = _p9._0;
+						var _p10 = _p14;
+						switch (_p10.ctor) {
+							case 'Connected':
+								return {
+									ctor: '_Tuple2',
+									_0: _elm_lang$core$Native_Utils.update(
+										model,
+										{
+											room: A2(_user$project$Main$Sharing, _p15, _user$project$Main$NegotiatingSession)
+										}),
+									_1: _user$project$Main$setRemoteDescription(_p11)
+								};
+							case 'GatheringICE':
+								return {
+									ctor: '_Tuple2',
+									_0: _elm_lang$core$Native_Utils.update(
+										model,
+										{
+											room: A2(_user$project$Main$Sharing, _p15, _user$project$Main$NegotiatingSession)
+										}),
+									_1: _elm_lang$core$Platform_Cmd$batch(
+										{
+											ctor: '::',
+											_0: _user$project$Main$setRemoteDescription(_p11),
+											_1: {
+												ctor: '::',
+												_0: _elm_lang$core$Platform_Cmd$batch(
+													A2(_elm_lang$core$List$map, _user$project$Main$addIceCandidate, _p10._0)),
+												_1: {ctor: '[]'}
+											}
+										})
+								};
+							default:
+								return {
+									ctor: '_Tuple2',
+									_0: _elm_lang$core$Native_Utils.update(
+										model,
+										{
+											room: A2(_user$project$Main$Sharing, _p15, _user$project$Main$NegotiatingSession)
+										}),
+									_1: _user$project$Main$setRemoteDescription(_p11)
+								};
+						}
+					case 'LocalICE':
+						return {
+							ctor: '_Tuple2',
+							_0: model,
+							_1: A2(
+								_user$project$Main$sendToServer,
+								model,
+								A2(_user$project$Main$wrapWithField, 'ice', _p9._0))
+						};
+					case 'RemoteICE':
+						var _p13 = _p9._0;
+						var _p12 = _p14;
+						switch (_p12.ctor) {
+							case 'Connected':
+								return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+							case 'GatheringICE':
+								return {
+									ctor: '_Tuple2',
+									_0: _elm_lang$core$Native_Utils.update(
+										model,
+										{
+											room: A2(
+												_user$project$Main$Sharing,
+												_p15,
+												_user$project$Main$GatheringICE(
+													{ctor: '::', _0: _p13, _1: _p12._0}))
+										}),
+									_1: _elm_lang$core$Platform_Cmd$none
+								};
+							default:
+								return {
+									ctor: '_Tuple2',
+									_0: model,
+									_1: _user$project$Main$addIceCandidate(_p13)
+								};
+						}
+					case 'AddStream':
+						return {
+							ctor: '_Tuple2',
+							_0: _elm_lang$core$Native_Utils.update(
+								model,
+								{
+									room: A2(
+										_user$project$Main$Sharing,
+										_p15,
+										_user$project$Main$Connected(_p9._0))
+								}),
+							_1: _elm_lang$core$Platform_Cmd$none
+						};
+					default:
+						return A2(_user$project$Main$invalidMessage, _p9, model);
+				}
+		}
+	});
 var _user$project$Main$main = _elm_lang$html$Html$programWithFlags(
 	{
 		init: function (hostname) {
 			return {
 				ctor: '_Tuple2',
 				_0: {
-					room: _elm_lang$core$Maybe$Nothing,
-					enteredRoomValue: '',
-					stream: _elm_lang$core$Maybe$Nothing,
+					room: _user$project$Main$InLobby(
+						{roomName: ''}),
 					errors: {ctor: '[]'},
-					numClients: 0,
 					hostname: hostname
 				},
 				_1: _elm_lang$core$Platform_Cmd$none

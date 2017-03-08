@@ -21,6 +21,10 @@ peerConnection.onaddstream = (event) => {
     app.ports.onAddStream.send(URL.createObjectURL(event.stream));
 };
 
+peerConnection.onconnectionstatechange = function(event) {
+  app.ports.errors.send(peerConnection.connectionState);
+}
+
 app.ports.addIceCandidate.subscribe((ice) => {
     peerConnection.addIceCandidate(new RTCIceCandidate(ice));
 });
@@ -31,8 +35,8 @@ app.ports.setRemoteDescription.subscribe((sdp) => {
             peerConnection.createAnswer().then((sdp) => {
                 peerConnection.setLocalDescription(sdp).then(() => {
                     app.ports.onAnswer.send(sdp);
-                }).catch(errorHandler);;
-            }).catch(errorHandler);;
+                }).catch(errorHandler);
+            }).catch(errorHandler);
         }
     }).catch(errorHandler);
 });
@@ -43,8 +47,8 @@ app.ports.createOffer.subscribe(() => {
         peerConnection.createOffer().then((desc) => {
             peerConnection.setLocalDescription(desc).then(() => {
                 app.ports.onOffer.send(desc);
-            }).catch(errorHandler);;
-        }).catch(errorHandler);;
+            }).catch(errorHandler);
+        }).catch(errorHandler);
     });
 });
 
