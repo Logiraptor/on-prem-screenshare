@@ -1,3 +1,5 @@
+require('webrtc-adapter');
+
 const Elm = require('./elm.js');
 
 var peerConnectionConfig = {
