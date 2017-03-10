@@ -82,9 +82,15 @@ type alias Stream =
     String
 
 
+type SDPState
+    = Unknown
+    | LocalOnly
+    | RemoteOnly
+    | Both
+
+
 type RTCPeerConnectionState
-    = GatheringICE (List ICECandiate)
-    | NegotiatingSession
+    = GatheringICE (List ICECandiate) SDPState
     | Connected Stream
 
 
@@ -153,11 +159,12 @@ viewSharing room connection =
 viewConnection : RTCPeerConnectionState -> Html.Html Msg
 viewConnection conn =
     case conn of
-        GatheringICE candidates ->
-            Html.span [] [ Html.text ("gathering ice (" ++ (toString (List.length candidates)) ++ ") so far.") ]
-
-        NegotiatingSession ->
-            Html.span [] [ Html.text "Negotiating Session" ]
+        GatheringICE candidates sdpstate ->
+            Html.span []
+                [ Html.text ("gathering ice (" ++ (toString (List.length candidates)) ++ ") so far.")
+                , Html.br [] []
+                , Html.text ("SDP: " ++ toString sdpstate)
+                ]
 
         Connected stream ->
             Html.video [ Attr.src stream, Attr.autoplay True ] []
@@ -204,13 +211,13 @@ update msg model =
         Waiting room ->
             case msg of
                 StartShare ->
-                    ( { model | room = Sharing room (GatheringICE []) }, createOffer () )
+                    ( { model | room = Sharing room (GatheringICE [] Unknown) }, createOffer () )
 
                 NumClients n ->
                     ( { model | room = Waiting ({ room | numClients = n }) }, Cmd.none )
 
                 RemoteICE val ->
-                    ( { model | room = Sharing room (GatheringICE [ val ]) }, Cmd.none )
+                    ( { model | room = Sharing room (GatheringICE [ val ] Unknown) }, Cmd.none )
 
                 RemoteSDP val ->
                     ( model, setRemoteDescription val )
@@ -224,23 +231,40 @@ update msg model =
                     ( { model | room = Sharing ({ room | numClients = n }) conn }, Cmd.none )
 
                 LocalSDP val ->
-                    ( model, sendToServer model (wrapWithField "sdp" val) )
+                    case conn of
+                        Connected s ->
+                            ( { model | room = Sharing room (Connected s) }, sendToServer model (wrapWithField "sdp" val) )
+
+                        GatheringICE candidates sdpstate ->
+                            case sdpstate of
+                                RemoteOnly ->
+                                    ( { model | room = Sharing room (GatheringICE candidates Both) }
+                                    , Cmd.batch
+                                        [ sendToServer model (wrapWithField "sdp" val)
+                                        , Cmd.batch (List.map addIceCandidate candidates)
+                                        ]
+                                    )
+
+                                _ ->
+                                    ( { model | room = Sharing room (GatheringICE candidates LocalOnly) }, sendToServer model (wrapWithField "sdp" val) )
 
                 RemoteSDP val ->
                     case conn of
-                        Connected _ ->
-                            ( { model | room = Sharing room NegotiatingSession }, setRemoteDescription val )
+                        Connected s ->
+                            ( { model | room = Sharing room (Connected s) }, setRemoteDescription val )
 
-                        GatheringICE candidates ->
-                            ( { model | room = Sharing room NegotiatingSession }
-                            , Cmd.batch
-                                [ setRemoteDescription val
-                                , Cmd.batch (List.map addIceCandidate candidates)
-                                ]
-                            )
+                        GatheringICE candidates sdpstate ->
+                            case sdpstate of
+                                LocalOnly ->
+                                    ( { model | room = Sharing room (GatheringICE candidates Both) }
+                                    , Cmd.batch
+                                        [ setRemoteDescription val
+                                        , Cmd.batch (List.map addIceCandidate candidates)
+                                        ]
+                                    )
 
-                        NegotiatingSession ->
-                            ( { model | room = Sharing room NegotiatingSession }, setRemoteDescription val )
+                                _ ->
+                                    ( { model | room = Sharing room (GatheringICE candidates RemoteOnly) }, setRemoteDescription val )
 
                 LocalICE val ->
                     ( model, sendToServer model (wrapWithField "ice" val) )
@@ -248,13 +272,10 @@ update msg model =
                 RemoteICE val ->
                     case conn of
                         Connected _ ->
-                            ( model, Cmd.none )
-
-                        GatheringICE candidates ->
-                            ( { model | room = Sharing room (GatheringICE (val :: candidates)) }, Cmd.none )
-
-                        NegotiatingSession ->
                             ( model, addIceCandidate val )
+
+                        GatheringICE candidates sdpstate ->
+                            ( { model | room = Sharing room (GatheringICE (val :: candidates) sdpstate) }, Cmd.none )
 
                 AddStream s ->
                     ( { model | room = Sharing room (Connected s) }, Cmd.none )
